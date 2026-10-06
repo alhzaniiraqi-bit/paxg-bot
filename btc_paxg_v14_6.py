@@ -1966,5 +1966,52 @@ def main():
         snapshot_state()
         log.info("%s stopped.", APP_NAME)
 
+# ✅ V14.6.1: Health check server for Back4App
+def start_health_server():
+    """Minimal HTTP server so Back4App/Render thinks we're a web app."""
+    import http.server
+    import socketserver
+    
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"BTC PAXG Bot is running")
+        
+        def log_message(self, format, *args):
+            pass  # silence logs
+    
+    port = int(os.getenv("PORT", "8080"))
+    try:
+        with socketserver.TCPServer(("0.0.0.0", port), Handler) as httpd:
+            log.info(f"Health check server on port {port}")
+            httpd.serve_forever()
+    except Exception as exc:
+        log.error(f"Health server failed: {exc}")
+
+
+def main():
+    # Start health server in background thread
+    health_thread = threading.Thread(target=start_health_server, daemon=True)
+    health_thread.start()
+    
+    try: 
+        signal.signal(signal.SIGINT, request_shutdown)
+    except Exception: 
+        pass
+    try: 
+        signal.signal(signal.SIGTERM, request_shutdown)
+    except Exception: 
+        pass
+    try:
+        asyncio.run(_bootstrap())
+    except KeyboardInterrupt: 
+        pass
+    finally:
+        snapshot_state()
+        log.info("%s stopped.", APP_NAME)
+
+
 if __name__ == "__main__":
     main()
